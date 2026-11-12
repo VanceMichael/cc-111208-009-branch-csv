@@ -1,0 +1,46 @@
+import argparse
+import json
+from pathlib import Path
+import sys
+from .parser import inspect
+from .journal import Journal
+from .transport import capture
+
+
+def main():
+    parser = argparse.ArgumentParser(description='地区预约 CSV 的显式编码与方言预览工具。')
+    sub = parser.add_subparsers(dest='command', required=True)
+    view = sub.add_parser('preview')
+    view.add_argument('source')
+    view.add_argument('--encoding', default='utf-8-sig')
+    view.add_argument('--delimiter', default=',')
+    raw = sub.add_parser('capture')
+    raw.add_argument('url')
+    raw.add_argument('--state', default='var')
+    raw.add_argument('--method', default='GET')
+    raw.add_argument('--body')
+    raw.add_argument('--header', action='append', default=[])
+    args = parser.parse_args()
+    try:
+        if args.command == 'capture':
+            headers = dict(value.split(':', 1) for value in args.header)
+            headers = {key.strip(): value.strip() for key, value in headers.items()}
+            status, response_headers, payload = capture(args.url, args.method,
+                Path(args.body).read_bytes() if args.body else None, headers)
+            journal = Journal(args.state)
+            try:
+                result = journal.save(payload, args.url)
+            finally:
+                journal.close()
+            result.update({'http_status': status, 'headers': response_headers})
+        else:
+            result = inspect(Path(args.source).read_bytes(), args.encoding, args.delimiter)
+        print(json.dumps(result, ensure_ascii=True, sort_keys=True))
+    except (ValueError, OSError) as error:
+        print(str(error), file=sys.stderr)
+        return 2
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

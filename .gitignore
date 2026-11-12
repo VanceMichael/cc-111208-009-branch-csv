@@ -1,12 +1,6 @@
-.env
-*.key
-*.pem
-node_modules/
-.venv/
-venv/
-dist/
-build/
-coverage/
 __pycache__/
-*.py[cod]
-.DS_Store
+*.pyc
+var/
+.tmp/
+/fixtures/bookings-gb.csv
+/fixtures/bookings.csv
