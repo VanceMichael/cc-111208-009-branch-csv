@@ -4,3 +4,4 @@ var/
 .tmp/
 /fixtures/bookings-gb.csv
 /fixtures/bookings.csv
+/fixtures/demo-bookings.csv

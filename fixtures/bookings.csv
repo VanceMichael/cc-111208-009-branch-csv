@@ -1,0 +1,4 @@
+bookingId,date,region,note
+B1,2026-11-12,East,"first
+second"
+B2,bad-date,West,review

@@ -1,6 +1,6 @@
 # branchcsv
 
-地区预约 CSV 的显式编码与方言预览工具。
+地区预约 CSV 的显式编码/方言工具，以及带隔离与复核的正式接收流程。
 
 ## 本地运行
 
@@ -14,7 +14,35 @@ python -m unittest discover -s tests -v
 python -m scripts.demo
 ```
 
-检查命令输出单份来源的结构摘要。`capture URL --method GET --state var` 仅接受 loopback HTTP，保存原始响应为 SHA256 文件，并在 SQLite captures 表登记；可用 `--header 'Name:Value'` 传头、`--body FILE` 传正文，不跟随重定向。检查器不执行多页、业务去重或正式接收。当前命令不包含待开发的 import 业务流程；新增能力与现有摘要工具的边界见 docs/acceptance.md。
+- `preview` 只按明确编码/方言查看结构，不写业务状态。
+- `capture` 保存单份 loopback HTTP 原始响应，按 SHA256 登记到 captures 表。
+- `receive` 是正式入口：复制并绑定文件摘要，按候选解析编码/方言，逐逻辑记录接收、隔离或去重，并在同一事务中写入业务行、隔离证据和恢复检查点。
+- `evidence` 列出一次接收中被隔离的记录（字节区间、行范围、原因、原文切片、复核状态）。
+- `slice` 按 `[start, end)` 取回原件字节，可核对隔离证据。
+- `review` 对隔离记录提交不可变字段修正。
+
+详细规则见 `docs/acceptance.md`（业务与复核）与 `docs/source-contract.md`（编码/方言/字节定位）。
+
+## 典型闭环
+
+```sh
+python -m scripts.materialize
+python -m branchcsv receive fixtures/demo-bookings.csv --state /tmp/var \
+  --encoding utf-8-sig --delimiter ,
+# 用输出里的 run_id 查看隔离证据
+python -m branchcsv evidence --state /tmp/var --run 1
+# 按证据中的 byte_start/byte_end 取回原件
+python -m branchcsv slice --state /tmp/var --digest <sha256> \
+  --start 74 --end 107 --raw
+# 复核坏日期
+python -m branchcsv review --state /tmp/var --run 1 --ordinal 3 \
+  --field date --value 2026-11-13 --reviewer ops --reason verified
+# 同一文件重跑：已核准决定复用，原始字节不变
+python -m branchcsv receive fixtures/demo-bookings.csv --state /tmp/var \
+  --encoding utf-8-sig --delimiter ,
+```
+
+`scripts.demo` 自动完成上述闭环，并在另一个临时状态目录演示中断后续跑，整段通常 1 秒内完成。
 
 ## 可复现容器
 
@@ -24,12 +52,12 @@ docker run --rm --network none branchcsv:local python -m unittest discover -s te
 docker run --rm --network none branchcsv:local
 ```
 
-镜像固定基础摘要。构建在正式运行前完成；运行和测试不安装包、不下载数据。演示命令实际执行检查器及本地来源，通常不超过 5 秒；它不是新增业务接收已实现的声明。开发完成后扩展 scripts/demo.py 展示一个真实业务闭环，完整输出并控制在 90 秒以内。
+镜像固定基础摘要。构建在正式运行前完成；运行和测试不安装包、不下载数据。
 
 ## 协议与来源
 
 - docs/source-contract.md 给出支持子集、字段及失败语义。
-- docs/acceptance.md 给出业务验收边界。
+- docs/acceptance.md 给出业务验收边界与隔离原因。
 - fixtures/source.json 是本地可重放 HTTP 路由；`python -m scripts.source_server --port 8765` 启动，`/__requests` 可检查实际请求。
 - scripts/materialize.py 将版本化 base64 二进制夹具还原为原始字节，重复执行安全；二进制文件不是用户附件。
-- journal.py 只记录原始响应，不代替新增流程自己的事务和恢复设计。
+- journal.py 只记录原始响应，不代替接收流程自己的事务和恢复设计。

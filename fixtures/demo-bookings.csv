@@ -1,0 +1,7 @@
+bookingId,date,region,note
+D1,2026-11-12,East,"first line
+second line"
+D2,2026-13-40,West,needs review
+bookingId,date,region,note
+D3,2026-11-14,North,"quoted ""inner"" text"
+D1,2026-11-15,East,conflicting duplicate
